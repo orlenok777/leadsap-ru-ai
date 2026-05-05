@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Дашборд — LeadSap</title>
+<link rel="stylesheet" href="style.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+</head>
+<body class="dash-body">
+
+<aside class="sidebar">
+<div class="brand">🌱 LeadSap</div>
+<nav>
+<a href="#" class="active" data-tab="leads">📋 Лиды</a>
+<a href="#" data-tab="chat">💬 Тестировать ИИ</a>
+<a href="#" data-tab="agent">⚙️ Настройка агента</a>
+<a href="#" data-tab="appts">📅 Встречи</a>
+</nav>
+<button id="logoutBtn" class="btn-logout">Выйти</button>
+</aside>
+
+<main class="dash-main">
+<header class="dash-header">
+<h1 id="pageTitle">Лиды</h1>
+<span id="userName"></span>
+</header>
+
+<section class="tab" data-tab-content="leads">
+<button class="btn-primary" id="addLeadBtn">+ Добавить лид</button>
+<div class="leads-list" id="leadsList">
+<div style="padding:2rem;text-align:center;color:#6b7280">Загрузка...</div>
+</div>
+</section>
+
+<section class="tab hidden" data-tab-content="chat">
+<div class="chat-container">
+<h3 style="margin-bottom:1rem">Тестовый чат с ИИ-агентом Claude</h3>
+<p style="color:#6b7280;margin-bottom:1rem">Здесь вы можете протестировать, как ваш ИИ-агент отвечает клиентам в WhatsApp. Настройте агента во вкладке слева.</p>
+<div class="chat-msgs" id="chatMsgs"></div>
+<form id="chatForm">
+<input type="text" id="chatInput" placeholder="Напишите как клиент..." required autocomplete="off"/>
+<button type="submit" class="btn-primary">Отправить</button>
+</form>
+</div>
+</section>
+
+<section class="tab hidden" data-tab-content="agent">
+<form id="agentForm" class="agent-form">
+<label>Название бизнеса</label>
+<input type="text" name="businessName" placeholder="Студия красоты Анна"/>
+<label>Описание (что вы делаете)</label>
+<textarea name="businessDesc" rows="3" placeholder="Косметология, маникюр, педикюр в центре города..."></textarea>
+<label>Часы работы</label>
+<input type="text" name="hours" placeholder="Пн-Пт 10:00-20:00, Сб 11:00-18:00"/>
+<label>Системный промпт для Claude (если оставить пустым — будет использован стандартный)</label>
+<textarea name="systemPrompt" rows="8" placeholder="Ты — дружелюбный ассистент студии красоты. Твоя задача узнать что нужно клиенту и записать на встречу..."></textarea>
+<button type="submit" class="btn-primary">Сохранить</button>
+<div class="msg" id="agentMsg"></div>
+</form>
+</section>
+
+<section class="tab hidden" data-tab-content="appts">
+<div class="leads-list" id="apptsList">
+<div style="padding:2rem;text-align:center;color:#6b7280">Пока нет записей</div>
+</div>
+</section>
+</main>
+
+<script>
+const token = localStorage.getItem('token');
+if (!token) window.location.href = 'login.html';
+
+const api = (path, opts = {}) => fetch('/api' + path, {
+  ...opts,
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + token,
+    ...(opts.headers || {})
+  }
+}).then(r => r.json());
+
+// Загрузка пользователя
+api('/auth/me').then(user => {
+  if (user.error) { localStorage.clear(); window.location.href = 'login.html'; return; }
+  document.getElementById('userName').textContent = user.name;
+  // Заполнить настройки агента
+  const f = document.getElementById('agentForm');
+  f.businessName.value = user.business_name || '';
+  f.businessDesc.value = user.business_desc || '';
+  f.hours.value = user.business_hours || '';
+  f.systemPrompt.value = user.system_prompt || '';
+});
+
+// Переключение вкладок
+document.querySelectorAll('.sidebar nav a').forEach(link => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const tab = link.dataset.tab;
+    document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.remove('active'));
+    link.classList.add('active');
+    document.querySelectorAll('.tab').forEach(t => t.classList.add('hidden'));
+    document.querySelector('[data-tab-content="' + tab + '"]').classList.remove('hidden');
+    const titles = { leads: 'Лиды', chat: 'Тестировать ИИ', agent: 'Настройка агента', appts: 'Встречи' };
+    document.getElementById('pageTitle').textContent = titles[tab];
+    if (tab === 'leads') loadLeads();
+    if (tab === 'appts') loadAppts();
+  });
+});
+
+// Логаут
+document.getElementById('logoutBtn').onclick = () => {
+  localStorage.clear();
+  window.location.href = 'login.html';
+};
+
+// Лиды
+async function loadLeads() {
+  const leads = await api('/leads');
+  const list = document.getElementById('leadsList');
+  if (!leads.length) {
+    list.innerHTML = '<div style="padding:2rem;text-align:center;color:#6b7280">Пока нет лидов. Нажмите «Добавить лид»</div>';
+    return;
+  }
+  list.innerHTML = leads.map(l => 
+    '<div class="lead-item"><div><strong>' + (l.name || 'Без имени') + '</strong><br><small style="color:#6b7280">' + (l.phone || '') + ' • ' + l.source + '</small></div>' +
+    '<div><span style="padding:.3rem .8rem;background:#e5e7eb;border-radius:6px;font-size:.85rem">' + l.status + '</span></div></div>'
+  ).join('');
+}
+loadLeads();
+
+document.getElementById('addLeadBtn').onclick = async () => {
+  const name = prompt('Имя клиента:');
+  if (!name) return;
+  const phone = prompt('Телефон (необязательно):') || '';
+  await api('/leads', { method: 'POST', body: JSON.stringify({ name, phone, source: 'manual' }) });
+  loadLeads();
+};
+
+// ИИ-чат с Claude
+const chatMsgs = document.getElementById('chatMsgs');
+const chatForm = document.getElementById('chatForm');
+
+function addMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + role;
+  div.textContent = text;
+  chatMsgs.appendChild(div);
+  chatMsgs.scrollTop = chatMsgs.scrollHeight;
+}
+
+chatForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  addMsg('user', text);
+  input.value = '';
+  input.disabled = true;
+  addMsg('bot', '...');
+  const lastBot = chatMsgs.lastChild;
+  try {
+    const res = await api('/chat/message', { method: 'POST', body: JSON.stringify({ message: text }) });
+    if (res.error) lastBot.textContent = '⚠️ ' + res.error;
+    else lastBot.textContent = res.reply;
+  } catch (err) {
+    lastBot.textContent = '⚠️ ' + err.message;
+  }
+  input.disabled = false;
+  input.focus();
+});
+
+// Настройка агента
+document.getElementById('agentForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const data = {
+    businessName: f.businessName.value,
+    businessDesc: f.businessDesc.value,
+    hours: f.hours.value,
+    systemPrompt: f.systemPrompt.value
+  };
+  await api('/auth/profile', { method: 'PATCH', body: JSON.stringify(data) });
+  const msg = document.getElementById('agentMsg');
+  msg.textContent = '✅ Настройки сохранены';
+  msg.className = 'msg success';
+  setTimeout(() => msg.className = 'msg', 2500);
+});
+
+async function loadAppts() {
+  const items = await api('/appointments');
+  const list = document.getElementById('apptsList');
+  if (!items.length) {
+    list.innerHTML = '<div style="padding:2rem;text-align:center;color:#6b7280">Пока нет встреч</div>';
+    return;
+  }
+  list.innerHTML = items.map(a => 
+    '<div class="lead-item"><div><strong>' + (a.title || 'Встреча') + '</strong><br><small style="color:#6b7280">' + (a.scheduled_at || '') + '</small></div></div>'
+  ).join('');
+}
+</script>
+</body>
+</html>
