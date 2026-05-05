@@ -1,0 +1,25 @@
+{
+  "name": "leadsap-ru-ai",
+  "version": "1.0.0",
+  "description": "LeadSap RU - ИИ-агент для WhatsApp с интеграцией Claude API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": ["leadsap", "ai", "claude", "anthropic", "whatsapp", "crm", "leads"],
+  "author": "orlenok777",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
