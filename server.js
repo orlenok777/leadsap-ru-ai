@@ -197,6 +197,9 @@ app.get('/api/health', (req, res) => {
     res.json({ ok: true, claude: !!anthropic, time: new Date().toISOString() });
 });
 
+// Attach WhatsApp Cloud API integration
+require('./whatsapp')({ app, db });
+
 app.listen(PORT, () => {
     console.log(`🌱 LeadSap server running on http://localhost:${PORT}`);
     console.log(`   Claude API: ${anthropic ? 'ready' : 'no API key'}`);
