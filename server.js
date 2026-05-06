@@ -69,6 +69,17 @@ db.exec(`
                                                                                                                                   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                                                                                                                                     );
                                                                                                                                     `);
+function ensureColumn(table, column, definition) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
+    if (!cols.includes(column)) {
+          db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+          console.log(`Migration: added column ${table}.${column}`);
+    }
+}
+ensureColumn('users', 'business_name', "TEXT DEFAULT ''");
+ensureColumn('users', 'business_desc', "TEXT DEFAULT ''");
+ensureColumn('users', 'business_hours', "TEXT DEFAULT ''");
+ensureColumn('users', 'system_prompt', "TEXT DEFAULT ''");
 
 const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
