@@ -18,13 +18,7 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS ||
                           'https://orlenok777.github.io,http://localhost:3000,http://127.0.0.1:3000'
                         ).split(',').map(s => s.trim());
 
-app.use(cors({
-    origin: (origin, cb) => {
-          if (!origin) return cb(null, true);
-          if (allowedOrigins.includes(origin)) return cb(null, true);
-          return cb(new Error('Not allowed by CORS: ' + origin));
-    }
-}));
+app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname)));
 
