@@ -16,6 +16,7 @@
 <a href="#" data-tab="chat">💬 Тестировать ИИ</a>
 <a href="#" data-tab="agent">⚙️ Настройка агента</a>
 <a href="#" data-tab="appts">📅 Встречи</a>
+<a href="#" data-tab="whatsapp">📱 WhatsApp</a>
 </nav>
 <button id="logoutBtn" class="btn-logout">Выйти</button>
 </aside>
@@ -60,6 +61,23 @@
 </form>
 </section>
 
+<section class="tab hidden" data-tab-content="whatsapp">
+  <div class="agent-form" style="max-width:680px">
+    <h3 style="margin-bottom:1rem">WhatsApp Business — автоответы Claude</h3>
+    <div id="waStatusBox" style="padding:14px;border-radius:10px;background:#f4f6f8;margin-bottom:16px;font-size:14px;line-height:1.6"></div>
+    <label style="display:block;margin:12px 0 4px;font-weight:600">Системный промпт (как Claude должен общаться с клиентами)</label>
+    <textarea id="waPrompt" rows="6" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-family:inherit;font-size:14px"></textarea>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer">
+      <input type="checkbox" id="waEnabled" /> Автоответы включены
+    </label>
+    <div style="margin-top:14px">
+      <button type="button" id="waSaveBtn" class="btn-primary" style="padding:10px 20px;border:none;border-radius:8px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;cursor:pointer;font-weight:600">Сохранить</button>
+      <span id="waSaveMsg" style="margin-left:10px;color:#0a8;font-size:13px"></span>
+    </div>
+    <h3 style="margin:24px 0 10px">Последние диалоги</h3>
+    <div id="waConvList" style="max-height:340px;overflow:auto;border:1px solid #eee;border-radius:8px"></div>
+  </div>
+</section>
 <section class="tab hidden" data-tab-content="appts">
 <div class="leads-list" id="apptsList">
 <div style="padding:2rem;text-align:center;color:#6b7280">Пока нет записей</div>
@@ -198,6 +216,52 @@ async function loadAppts() {
     '<div class="lead-item"><div><strong>' + (a.title || 'Встреча') + '</strong><br><small style="color:#6b7280">' + (a.scheduled_at || '') + '</small></div></div>'
   ).join('');
 }
+
+// WhatsApp tab logic
+async function loadWaTab() {
+  try {
+    const r = await fetch('/api/wa/status');
+    const s = await r.json();
+    const box = document.getElementById('waStatusBox');
+    const lines = [];
+    lines.push('<b>Конфигурация Meta:</b> ' + (s.configured ? '<span style="color:#0a8">✅ Настроена</span>' : '<span style="color:#c00">❌ Не настроена</span>'));
+    lines.push('<b>Anthropic API:</b> ' + (s.hasAnthropic ? '<span style="color:#0a8">✅ Ключ добавлен</span>' : '<span style="color:#c00">❌ Нет ключа</span>'));
+    lines.push('<b>Webhook URL:</b> <code style="background:#fff;padding:2px 6px;border-radius:4px">' + window.location.origin + s.webhookUrl + '</code>');
+    if (!s.configured) {
+      lines.push('<div style="margin-top:10px;padding:10px;background:#fff3cd;border-radius:6px;font-size:13px">Для работы добавьте в Render Environment: WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN</div>');
+    }
+    box.innerHTML = lines.join('<br>');
+    document.getElementById('waPrompt').value = s.systemPrompt || '';
+    document.getElementById('waEnabled').checked = !!s.enabled;
+  } catch (e) {
+    document.getElementById('waStatusBox').textContent = 'Ошибка загрузки: ' + e.message;
+  }
+  try {
+    const r = await fetch('/api/wa/conversations');
+    const list = await r.json();
+    const el = document.getElementById('waConvList');
+    if (!list.length) { el.innerHTML = '<div style="padding:14px;color:#888">Пока нет сообщений</div>'; return; }
+    el.innerHTML = list.map(c => '<div style="padding:10px 12px;border-bottom:1px solid #f0f0f0">' +
+      '<div style="font-weight:600;font-size:13px">+' + c.chat_id + ' <span style="color:#888;font-weight:400">· ' + c.cnt + ' сообщений</span></div>' +
+      '<div style="color:#555;font-size:13px;margin-top:2px">' + (c.last_dir==='out'?'↵ ':'') + (c.last_body||'').substring(0,120).replace(/</g,'&lt;') + '</div>' +
+      '<div style="color:#aaa;font-size:11px;margin-top:2px">' + (c.last_ts||'') + '</div></div>').join('');
+  } catch (e) {}
+}
+document.getElementById('waSaveBtn').addEventListener('click', async () => {
+  const systemPrompt = document.getElementById('waPrompt').value;
+  const enabled = document.getElementById('waEnabled').checked;
+  const msg = document.getElementById('waSaveMsg');
+  msg.textContent = 'Сохранение...';
+  try {
+    const r = await fetch('/api/wa/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ systemPrompt, enabled }) });
+    if (!r.ok) throw new Error('save failed');
+    msg.textContent = '✓ Сохранено';
+    setTimeout(() => msg.textContent='', 2500);
+  } catch (e) { msg.textContent = '❌ ' + e.message; }
+});
+document.querySelectorAll('nav a[data-tab="whatsapp"]').forEach(a => a.addEventListener('click', loadWaTab));
+loadWaTab();
+
 </script>
 </body>
 </html>
